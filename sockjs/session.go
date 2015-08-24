@@ -13,13 +13,13 @@ type sessionState uint32
 
 const (
 	// brand new session, need to send "h" to receiver
-	sessionOpening sessionState = iota
+	SessionOpening sessionState = iota
 	// active session
-	sessionActive
+	SessionActive
 	// session being closed, sending "closeFrame" to receivers
-	sessionClosing
+	SessionClosing
 	// closed session, no activity at all, should be removed from handler completely and not reused
-	sessionClosed
+	SessionClosed
 )
 
 var (
