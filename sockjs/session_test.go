@@ -2,7 +2,9 @@ package sockjs
 
 import (
 	"io"
+	"net/http"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -25,8 +27,20 @@ func TestSession_Create(t *testing.T) {
 	if len(session.sendBuffer) != 2 {
 		t.Errorf("Session send buffer should contain 2 messages")
 	}
-	if session.state != sessionOpening {
-		t.Errorf("Session in wrong state %v, should be %v", session.state, sessionOpening)
+	if session.GetSessionState() != SessionOpening {
+		t.Errorf("Session in wrong state %v, should be %v", session.GetSessionState(), SessionOpening)
+	}
+}
+
+func TestSession_Request(t *testing.T) {
+	req, _ := http.NewRequest("POST", "/server/session/jsonp_send", strings.NewReader("[\"message\"]"))
+	sess := newSession(req, "session", time.Second, time.Second)
+
+	if sess.Request() == nil {
+		t.Error("Session initial request should have been saved.")
+	}
+	if sess.Request().URL.String() != req.URL.String() {
+		t.Errorf("Expected stored session request URL to equal %s, got %s", req.URL.String(), sess.Request().URL.String())
 	}
 }
 
@@ -73,8 +87,8 @@ func TestSession_AttachReceiver(t *testing.T) {
 	if err := session.attachReceiver(recv); err != nil {
 		t.Errorf("Should not return error")
 	}
-	if session.state != sessionActive {
-		t.Errorf("Session in wrong state after receiver attached %d, should be %d", session.state, sessionActive)
+	if session.GetSessionState() != SessionActive {
+		t.Errorf("Session in wrong state after receiver attached %d, should be %d", session.GetSessionState(), SessionActive)
 	}
 	session.detachReceiver()
 	// recv = &mockRecv{
@@ -96,7 +110,7 @@ func TestSession_Timeout(t *testing.T) {
 		t.Errorf("sess close notification channel should close")
 	}
 	sess.Lock()
-	if sess.state != sessionClosed {
+	if sess.GetSessionState() != SessionClosed {
 		t.Errorf("Session did not timeout")
 	}
 	sess.Unlock()
@@ -262,7 +276,7 @@ func TestSession_SessionSend(t *testing.T) {
 
 func TestSession_SessionClose(t *testing.T) {
 	s := newTestSession()
-	s.state = sessionActive
+	s.state = SessionActive
 	recv := newTestReceiver()
 	s.attachReceiver(recv)
 	err := s.Close(1, "some reason")
@@ -275,8 +289,8 @@ func TestSession_SessionClose(t *testing.T) {
 	if s.closeFrame != "c[1,\"some reason\"]" {
 		t.Errorf("Incorrect closeFrame, got '%s'", s.closeFrame)
 	}
-	if s.state != sessionClosing {
-		t.Errorf("Incorrect session state, expected 'sessionClosing', got '%v'", s.state)
+	if s.GetSessionState() != SessionClosing {
+		t.Errorf("Incorrect session state, expected 'sessionClosing', got '%v'", s.GetSessionState())
 	}
 	// all the consequent receivers trying to attach shoult get the same close frame
 	var i = 100
